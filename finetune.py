@@ -12,7 +12,8 @@ from torch.utils.data import Dataset
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 import transformers
-from transformers import Trainer, GPTQConfig, deepspeed
+from transformers import Trainer, GPTQConfig
+from transformers.integrations import is_deepspeed_zero3_enabled
 from transformers.trainer_pt_utils import LabelSmoother
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from accelerate.utils import DistributedType
@@ -109,7 +110,7 @@ def rank0_print(*args):
 def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: str, bias="none"):
     """Collects the state dict and dump to disk."""
     # check if zero3 mode enabled
-    if deepspeed.is_deepspeed_zero3_enabled():
+    if is_deepspeed_zero3_enabled():
         state_dict = trainer.model_wrapped._zero3_consolidated_16bit_state_dict()
     else:
         if trainer.args.use_lora:
@@ -277,7 +278,7 @@ def train():
     ddp = world_size != 1
     if lora_args.q_lora:
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if ddp else "auto"
-        if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
+        if len(training_args.fsdp) > 0 or is_deepspeed_zero3_enabled():
             logging.warning(
                 "FSDP or ZeRO3 are incompatible with QLoRA."
             )
@@ -286,13 +287,13 @@ def train():
     if (
             training_args.use_lora
             and not lora_args.q_lora
-            and deepspeed.is_deepspeed_zero3_enabled()
+            and is_deepspeed_zero3_enabled()
             and not is_chat_model
     ):
         raise RuntimeError("ZeRO3 is incompatible with LoRA when finetuning on base model.")
 
     model_load_kwargs = {
-        'low_cpu_mem_usage': not deepspeed.is_deepspeed_zero3_enabled(),
+        'low_cpu_mem_usage': not is_deepspeed_zero3_enabled(),
     }
 
     # Set RoPE scaling factor
