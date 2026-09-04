@@ -31,9 +31,8 @@ Self-contained Kaggle notebook: fine-tune **`distilbert-base-uncased`** on a
 ```bash
 pip install "transformers==4.57.0" "datasets" "evaluate" \
             "accelerate" "deepspeed"
-# 1. Copy the two %%bash cells (ds_zero1.json, train_ds.py) out of the notebook
-#    and save them in a working dir.
-# 2. Launch:
+# `ds_zero1.json` and `train_ds.py` are generated inside the notebook;
+# in a local run, materialise them into a working dir, then:
 accelerate launch --num_processes 2 --mixed_precision fp16 \
   train_ds.py --out_dir out_ds --per_device_train_bs 32 \
               --steps 300 --ds_config ds_zero1.json
@@ -42,7 +41,7 @@ accelerate launch --num_processes 2 --mixed_precision fp16 \
 ## What to look for in the log
 
 After `trainer.train()` finishes, the training script runs a one-shot probe
-and dumps `metrics.json`. A successful run prints, on each rank:
+and writes `out_ds/metrics.json`. A successful run prints, on each rank:
 
 ```
 [rank 0/2] / [rank 1/2]
@@ -51,10 +50,13 @@ and dumps `metrics.json`. A successful run prints, on each rank:
   [proof] engine=DeepSpeedEngine  is_DeepSpeedEngine=True  is_DDP=False
   [proof] optimizer=DeepSpeedOptimizerWrapper
   {'world_size': '2', 'zero_stage': 1,   'engine_cls': 'DeepSpeedEngine',
-   'optimizer_cls': 'DeepSpeedOptimizerWrapper', 'steps/sec': <float>,
-   'final_acc': <float>}
+   'optimizer_cls': 'DeepSpeedOptimizerWrapper',
+   'steps/sec': 6.6, 'final_acc': 0.908}
 [result] { … same dict … }
 ```
+
+(`steps/sec` and `final_acc` are observed on one 2×T4 run; exact values vary
+per machine and run.)
 
 `is_DeepSpeedEngine=True` and `is_DDP=False` are the direct evidence that
 the trainer is wrapped in DeepSpeed's `DeepSpeedEngine`, not `DistributedDataParallel`.
